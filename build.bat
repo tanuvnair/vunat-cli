@@ -8,13 +8,27 @@ if not exist "%BIN_DIR%" (
     mkdir "%BIN_DIR%"
 )
 
-echo Building vunat-cli...
-
-go build -o "%BIN_DIR%\vunat.exe" "%CMD_DIR%"
+echo Building vunat-cli for Windows...
+set GOOS=windows
+set GOARCH=amd64
+go build -o "%BIN_DIR%\vunat-windows-amd64.exe" "%CMD_DIR%"
 
 if errorlevel 1 (
-    echo Build failed.
+    echo Windows build failed.
     exit /b 1
 )
 
-echo Build successful: %BIN_DIR%\vunat.exe
+echo Building vunat-cli for Linux...
+set GOOS=linux
+set GOARCH=amd64
+go build -o "%BIN_DIR%\vunat-linux-amd64" "%CMD_DIR%"
+
+if errorlevel 1 (
+    echo Linux build failed.
+    exit /b 1
+)
+
+echo Build successful:
+echo   - Windows: %BIN_DIR%\vunat-windows-amd64.exe
+echo   - Linux: %BIN_DIR%\vunat-linux-amd64
+

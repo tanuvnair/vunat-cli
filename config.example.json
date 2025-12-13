@@ -1,0 +1,20 @@
+{
+  "projects": {
+    "gradepoint": [
+      {
+        "name": "frontend",
+        "absolutePath": "",
+        "commands": ["npm run dev"]
+      },
+      {
+        "name": "backend",
+        "absolutePath": "",
+        "commands": [
+          "go run ./cmd/api/main.go",
+          "go run ./cmd/scheduler/main.go",
+          "npx prisma@6 studio -y"
+        ]
+      }
+    ]
+  }
+}

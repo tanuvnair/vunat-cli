@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"strings"
 	"sync"
+	"syscall"
 
 	"github.com/tanuvnair/vunat-cli/internal/projects"
 )
@@ -24,6 +26,28 @@ func runStart(args []string) error {
 	}
 
 	fmt.Printf("Starting project: %s\n\n", projectName)
+
+	// Store all running commands for graceful shutdown
+	var allCommands []*exec.Cmd
+	var allCommandsMu sync.Mutex
+
+	// Set up signal handling for graceful shutdown
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	// Start a goroutine to handle shutdown
+	go func() {
+		<-sigChan
+		fmt.Println("\n\nShutting down all processes...")
+		allCommandsMu.Lock()
+		for _, cmd := range allCommands {
+			if cmd.Process != nil {
+				cmd.Process.Kill()
+			}
+		}
+		allCommandsMu.Unlock()
+		os.Exit(0)
+	}()
 
 	// Iterate through each command group sequentially
 	for _, group := range project {
@@ -81,6 +105,11 @@ func runStart(args []string) error {
 					return
 				}
 
+				// Store the command for graceful shutdown
+				allCommandsMu.Lock()
+				allCommands = append(allCommands, execCmd)
+				allCommandsMu.Unlock()
+
 				// Prefix output with group name
 				prefix := fmt.Sprintf("[%s] ", groupName)
 
@@ -100,27 +129,49 @@ func runStart(args []string) error {
 					}
 				}()
 
-				// Wait for command to finish
-				if err := execCmd.Wait(); err != nil {
-					mu.Lock()
-					if firstError == nil {
-						firstError = err
+				// Wait for command to finish (in background, don't block)
+				go func() {
+					if err := execCmd.Wait(); err != nil {
+						mu.Lock()
+						if firstError == nil {
+							firstError = err
+						}
+						mu.Unlock()
 					}
-					mu.Unlock()
-				}
+				}()
 			}(cmdStr, group.Name, group.AbsolutePath)
 		}
 
-		// Wait for all commands in this group to finish
+		// Wait for all commands in this group to start (not finish)
 		wg.Wait()
 
 		if firstError != nil {
+			// Clean up started processes
+			allCommandsMu.Lock()
+			for _, cmd := range allCommands {
+				if cmd.Process != nil {
+					cmd.Process.Kill()
+				}
+			}
+			allCommandsMu.Unlock()
 			return fmt.Errorf("error in group %s: %w", group.Name, firstError)
 		}
 
-		fmt.Printf("[%s] Completed\n\n", group.Name)
+		fmt.Printf("[%s] Started\n\n", group.Name)
 	}
 
-	fmt.Printf("All groups completed successfully!\n")
+	fmt.Printf("All services started! Press Ctrl+C to stop.\n\n")
+
+	// Keep the main process alive and wait for interrupt signal
+	<-sigChan
+	fmt.Println("\n\nShutting down all processes...")
+	allCommandsMu.Lock()
+	for _, cmd := range allCommands {
+		if cmd.Process != nil {
+			cmd.Process.Kill()
+		}
+	}
+	allCommandsMu.Unlock()
+
 	return nil
 }

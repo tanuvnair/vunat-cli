@@ -9,8 +9,6 @@ A small, opinionated CLI to quickly start development projects composed of multi
 
 This repository contains a compact, testable Go implementation with clear separation of concerns: config manager, launcher, runner, and CLI registry.
 
----
-
 ## Contents
 
 - `cmd/vunat` — CLI entrypoint
@@ -19,8 +17,6 @@ This repository contains a compact, testable Go implementation with clear separa
 - `internal/projects` — config loader / project registry
 - `internal/runner` — process supervision and output streaming
 - `internal/launcher` — OS-aware opener for files/URLs
-
----
 
 ## Quick links
 
@@ -50,8 +46,6 @@ Example snippet:
 }
 ```
 
----
-
 ## Build
 
 - Unix / macOS:
@@ -68,8 +62,6 @@ You can also run in development mode with the Go toolchain:
 ```sh
 go run ./cmd/vunat help
 ```
-
----
 
 ## Install (recommended workflow)
 
@@ -128,8 +120,6 @@ vunat start <project_name>
 vunat config
 ```
 
----
-
 ## Usage
 
 - Show help (dynamic, generated from registered commands):
@@ -152,8 +142,6 @@ vunat start <project_name>
 vunat config
 ```
 
----
-
 ## Configuration
 
 - The per-user configuration file is `~/.vunat/config.json`.
@@ -166,8 +154,6 @@ vunat config
     - `absolutePath` — directory where the commands will run (empty allowed)
     - `commands` — array of shell command strings
 
----
-
 ## Editing the config
 
 - If the `EDITOR` environment variable is set, `vunat config` will invoke that editor and wait for it to exit.
@@ -175,8 +161,6 @@ vunat config
   - Windows: `cmd /c start "" <path>`
   - macOS: `open <path>`
   - Linux: `xdg-open <path>`
-
----
 
 ## Architecture notes
 

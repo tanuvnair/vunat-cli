@@ -2,58 +2,52 @@ package cli
 
 import (
 	"fmt"
+	"strings"
+	"text/tabwriter"
 
-	"github.com/tanuvnair/vunat-cli/internal/projects"
+	"github.com/tanuvnair/vunat-cli/internal/cli/commands"
+	"github.com/tanuvnair/vunat-cli/internal/config"
+	"github.com/tanuvnair/vunat-cli/internal/launcher"
+	"github.com/tanuvnair/vunat-cli/internal/runner"
 )
 
+// Run constructs the application's dependencies, registers commands into the
+// Registry and dispatches the provided args to the selected command.
 func Run(args []string) error {
-	if len(args) < 2 {
-		return usageError()
-	}
+	// Construct shared dependencies
+	cfgMgr := config.NewFSManager("")
+	osLauncher := launcher.NewOSLauncher(false)
+	runr := runner.New()
 
-	switch args[1] {
-	case "start":
-		return runStart(args[2:])
-	case "list":
-		return listProjects()
-	case "help":
-		return printHelp()
-	default:
-		return fmt.Errorf("unknown command: %s", args[1])
-	}
-}
+	// Build registry and register commands
+	reg := NewRegistry()
 
-func usageError() error {
-	return fmt.Errorf("usage: vunat <command> [args]\n\nCommands:\n  start <project_name>  Start a project\n  list                  List all projects\n  help                  Show help")
-}
+	// Register command implementations (start, list, config)
+	reg.Register(commands.NewStartCommand(runr))
+	reg.Register(commands.NewListCommand())
+	reg.Register(commands.NewConfigCommand(cfgMgr, osLauncher))
 
-func printHelp() error {
-	fmt.Println("vunat-cli - your personal CLI for quick-starting development projects")
-	fmt.Println()
-	fmt.Println("usage:")
-	fmt.Println("  vunat start <project_name>  Start a project")
-	fmt.Println("  vunat list                  List all registered projects")
-	fmt.Println("  vunat help                  Show this help message")
-	return nil
-}
+	// Register dynamic help command. The provider builds help text from the
+	// registry contents so help is always up-to-date.
+	helpProvider := func() string {
+		var b strings.Builder
+		b.WriteString("vunat-cli - your personal CLI for quick-starting development projects\n\n")
+		b.WriteString("usage:\n")
+		b.WriteString("  vunat <command> [args]\n\n")
+		b.WriteString("Available commands:\n")
 
-func listProjects() error {
-	allProjects := projects.GetAll()
-
-	if len(allProjects) == 0 {
-		fmt.Println("No projects registered. Add projects to ~/.vunat/config.json")
-		return nil
-	}
-
-	fmt.Println("Registered projects:")
-	for name, project := range allProjects {
-		fmt.Printf("  %s\n", name)
-		for _, group := range project {
-			fmt.Printf("    [%s] in %s\n", group.Name, group.AbsolutePath)
-			for _, cmd := range group.Commands {
-				fmt.Printf("      → %s\n", cmd)
-			}
+		// Use tabwriter to align command names and their descriptions in columns.
+		w := tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
+		for _, c := range reg.Commands() {
+			fmt.Fprintf(w, "  %s\t%s\n", c.Name(), c.Help())
 		}
+		_ = w.Flush()
+
+		b.WriteString("\n")
+		return b.String()
 	}
-	return nil
+	reg.Register(commands.NewHelpCommand(helpProvider))
+
+	// Dispatch to the registry
+	return reg.Run(args)
 }
